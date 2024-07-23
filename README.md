@@ -1,6 +1,8 @@
 # EvoSeq-ML: Enhancing Protein Engineering with Evolutionary Data
 
-![EvoSeq Figure](figure/6-1.png)
+![EvoSeq Figure](6-1.png)
+
+
 
 Welcome to the EvoSeq-ML project! 🎉 This project leverages ancestral sequence reconstruction (ASR) to enhance machine learning models for protein engineering. Our approach aims to improve protein sequence generation and fine-tuning using rich evolutionary data.
 
