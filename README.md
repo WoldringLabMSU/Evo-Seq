@@ -1,6 +1,6 @@
 # EvoSeq-ML: Enhancing Protein Engineering with Evolutionary Data
 
-![EvoSeq Figure](6-1.png)
+![EvoSeq Figure](./Figures/6-1.png)
 
 
 
