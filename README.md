@@ -8,7 +8,7 @@ Welcome to the EvoSeq-ML project! 🎉 This project leverages ancestral sequence
 
 ## Table of Contents
 - [Introduction](#introduction)
-- [Preprocessing and Ancestral Sequence Reconstruction](#preprocessing-and-ancestral-sequence-reconstruction)
+- [Ancestral Sequence Reconstruction](#ancestral-sequence-reconstruction)
 - [Usage](#usage)
 - [Citation](#citation)
 
@@ -16,7 +16,13 @@ Welcome to the EvoSeq-ML project! 🎉 This project leverages ancestral sequence
 ## Introduction
 
 In protein engineering, advancements in machine learning (ML) have led to significant progress, such as predicting protein structures and generating novel proteins. However, the importance of high-quality data curation is often overlooked. EvoSeq-ML integrates ASR into ML models, providing diverse and stable sequences with rich evolutionary information. This approach enhances ML model performance in tasks related to protein sequence generation and fitness prediction.
-
+- **Building Evolutionary Data:**
+    - We start by constructing phylogenetic trees to infer ancient protein sequences from modern descendants.
+    - ASR offers deeper insights into protein evolution, capturing mutation rates, phylogenic relationships, and evolutionary trajectories.
+- **Ancestral Sequence Inference:**
+    - Using both Bayesian inference and maximum likelihood methods, we generate ensembles of ancestral sequences.
+    - These sequences provide a robust dataset that reflects the complexity and diversity of biological systems.
+    - Ancestral sequences are often more stable, promiscuous, and evolvable, making them ideal for training ML models.
 - **Generative Models:**
     - We use Variational Autoencoders (VAEs) to generate novel protein sequences.
     - The training data includes ancestral sequences reconstructed through ASR, ensuring high-quality and diverse inputs.
@@ -27,24 +33,25 @@ In protein engineering, advancements in machine learning (ML) have led to signif
     - Our evolutionary-driven representations have shown improved performance in protein classification tasks, demonstrating the effectiveness of integrating ASR data.
     - Generated sequences are evaluated for structural stability, sequence variability, and semantic diversity using tools like AlphaFold and FoldX.
 
-## Preprocessing and Ancestral Sequence Reconstruction
-
-1. **Building Evolutionary Data:**
-    - We start by constructing phylogenetic trees to infer ancient protein sequences from modern descendants.
-    - ASR offers deeper insights into protein evolution, capturing mutation rates, phylogenic relationships, and evolutionary trajectories.
-
-2. **Ancestral Sequence Inference:**
-    - Using both Bayesian inference and maximum likelihood methods, we generate ensembles of ancestral sequences.
-    - These sequences provide a robust dataset that reflects the complexity and diversity of biological systems.
-
-3. **Key Benefits:**
-    - Ancestral sequences are often more stable, promiscuous, and evolvable, making them ideal for training ML models.
-
-#### ASR tools used in this work include [AP-LASR](https://github.com/WoldringLabMSU/AP-LASR) and [BAli--Phy](https://www.bali-phy.org/).
+## Ancestral Sequence Reconstruction
+- ASR tools used in this work include [AP-LASR](https://github.com/WoldringLabMSU/AP-LASR) and [BAli--Phy](https://www.bali-phy.org/).
+- <b>AP-LASR</b> documentation is provided in the [AP-LASR](https://github.com/WoldringLabMSU/AP-LASR) repository.
+- <b>BAli--Phy</b>
+    - The conda environment for BAli--Phy is provided in `Sequence Reconstruction/BaliAncestor.yml`.
+    - Sequence reconstruction can be performed with the notebook `Sequence Reconstruction/BaliPhyAncestorSampling.ipynb`
 
 > Reference: Redelings BD BAli-Phy version 3: model-based co-estimation of alignment and phylogeny. (2021) Bioinformatics 37(18). doi:10.1093/bioinformatics/btab129.
 
 ## Usage
+- Dependencies:
+    - numpy
+    - pandas
+    - scipy
+    - torch
+    - torchmetrics
+    - biopython
+    - fair-esm
+    - tqdm
 - Training script: `Generative Model/oh_vae_train.py`
     - Expects input file `cleaned-aligned-sampled.fasta` to be present in the wokring directory (same directory as the script).
     - Outputs saved model checkpoints as `Bali_vae_oh_latent100_16_1CNN_{lowest-val-loss}.pth` in the working directory.
