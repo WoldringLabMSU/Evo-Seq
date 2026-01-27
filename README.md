@@ -32,12 +32,24 @@ In protein engineering, advancements in machine learning (ML) have led to signif
 3. **Key Benefits:**
     - Ancestral sequences are often more stable, promiscuous, and evolvable, making them ideal for training ML models.
 
+#### ASR tools used in this work include [AP-LASR](https://github.com/WoldringLabMSU/AP-LASR) and [BAli--Phy](https://www.bali-phy.org/).
+
+> Reference: Redelings BD BAli-Phy version 3: model-based co-estimation of alignment and phylogeny. (2021) Bioinformatics 37(18). doi:10.1093/bioinformatics/btab129.
+
 ## Protein Sequence Generation
 
 - **Generative Models:**
     - We use Variational Autoencoders (VAEs) to generate novel protein sequences.
     - The training data includes ancestral sequences reconstructed through ASR, ensuring high-quality and diverse inputs.
-
+    - Training script: `Generative Model/oh_vae_train.py`
+        - Expects input file `cleaned-aligned-sampled.fasta` to be present in the wokring directory (same directory as the script).
+        - Outputs saved model checkpoints as `Bali_vae_oh_latent100_16_1CNN_{lowest-val-loss}.pth` in the working directory.
+    - Finetuning script: `Fine-Tuning/fine-tune.py`
+        - Expects input fasta file which may be modified in line 96, which currently shows example usage with `Lysozyme.fasta`.
+        - Outputs fine-tuned model to working directory. The nomenclature for saved models may be edited in line 92.
+    - Generation script: `Generative Model/oh_vae_generate_from_training.py`
+        - Modify the `model_path` variable in line 50 to the desired model checkpoint path.
+        - Outputs sequences to a csv with default name `generated_pk2_Bali_16_1CNN_improved.csv`. This may be edited in line 54 of the script.
 - **Evaluation:**
     - Generated sequences are evaluated for structural stability, sequence variability, and semantic diversity using tools like AlphaFold and FoldX.
 
