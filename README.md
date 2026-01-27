@@ -10,6 +10,7 @@ Welcome to the EvoSeq-ML project! 🎉 This project leverages ancestral sequence
 - [Introduction](#introduction)
 - [Preprocessing and Ancestral Sequence Reconstruction](#preprocessing-and-ancestral-sequence-reconstruction)
 - [Usage](#usage)
+- [Citation](#citation)
 
 
 ## Introduction
@@ -55,4 +56,7 @@ In protein engineering, advancements in machine learning (ML) have led to signif
     - Outputs sequences to a csv with default name `generated_pk2_Bali_16_1CNN_improved.csv`. This may be edited in line 54 of the script.
 
 
+## Citation
+Please cite our [preprint](https://www.biorxiv.org/content/10.1101/2024.10.02.616302v1)! Official peer-reviewed publication coming soon.
 
+> Mardikoraem, M., Pascual, N., Finneran, P., & Woldring, D. (2024). EvoSeq-ML: Advancing Data-Centric Machine Learning with Evolutionary-Informed Protein Sequence Representation and Generation. bioRxiv, 2024-10.
