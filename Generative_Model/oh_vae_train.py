@@ -7,6 +7,7 @@ from vae_oh_CNN import ProteinVAE
 import os
 import random
 from Bio import SeqIO
+import argparse
 
 def one_hot_encode(sequence, amino_acids="ACDEFGHIKLMNPQRSTVWY-"):
     encoding = torch.zeros(len(sequence), len(amino_acids))
@@ -33,7 +34,7 @@ def train_val_split(data, val_ratio=0.1):
     train_data = shuffled_data[val_size:]
     return train_data, val_data
 
-def train_vae_model(vae, train_loader, val_loader, device, num_epochs=300, lr=0.0001, weight_decay=1e-8, patience=5):
+def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix num_epochs=300, lr=0.0001, weight_decay=1e-8, patience=5):
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=weight_decay)
     lowest_val_loss = float('inf')
     patience_counter = 0
@@ -71,7 +72,7 @@ def train_vae_model(vae, train_loader, val_loader, device, num_epochs=300, lr=0.
             if prev_best_model_filename and os.path.exists(prev_best_model_filename):
                 os.remove(prev_best_model_filename)
             
-            filename = f"Bali_vae_oh_latent100_16_1CNN_{lowest_val_loss:.6f}.pth"
+            filename = f"{out_dir}/{out_prefix}_{lowest_val_loss:.6f}.pth"
             torch.save(vae.state_dict(), filename)
             print(f"Epoch {epoch+1}/{num_epochs}: New best model saved with Validation Loss: {lowest_val_loss:.6f}")
             prev_best_model_filename = filename
@@ -82,10 +83,21 @@ def train_vae_model(vae, train_loader, val_loader, device, num_epochs=300, lr=0.
                 break
 
 def main():
-    fasta_file = 'cleaned-aligned-sampled.fasta'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', type=str, required=True, help='Path to input fasta file')
+    parser.add_argument('-o', '--output_dir', type=str, required=False, default='models', help='Path to directory where trained model checkpoints will be saved.')
+    parser.add_argument('-p', '--prefix', type=str, required=False, default='OneHot_VAE_latent100_16_1CNN', help='Prefix for output model file name.')
+    args = parser.parse_args()
+    
+    fasta_file = args.input
+    out_dir = args.output_dir
+    out_prefix = args.prefix
+
+    os.makedirs(out_dir, exist_ok=True)
+
     sequences = read_fasta_sequences(fasta_file)
     print(f"Sequence length: {len(sequences[1])}")
-    
+
     encoded_data = [one_hot_encode(seq) for seq in sequences]
     X_train, X_val = train_val_split(encoded_data, val_ratio=0.1)
 
@@ -95,7 +107,7 @@ def main():
     train_loader = DataLoader(X_train, batch_size=16, shuffle=True)
     val_loader = DataLoader(X_val, batch_size=16, shuffle=False)
 
-    train_vae_model(vae, train_loader, val_loader, device)
+    train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix)
 
 if __name__ == "__main__":
     main()

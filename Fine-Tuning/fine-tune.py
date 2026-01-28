@@ -5,6 +5,8 @@ import esm
 import functions  # Assuming this module contains get_fasta_dict and SeqDataset
 import torch.nn.functional as F
 import os
+import argparse
+
 
 # ESM alphabet
 esm_alphabet = [
@@ -23,7 +25,7 @@ class ESMWithClassifier(nn.Module):
         outputs = self.esm_model(x, repr_layers=[12])['representations'][12]
         return self.classifier(outputs.reshape(-1, 480))
 
-def fine_tune_esm(fasta_file, alphabet_size, num_epochs, batch_size=64, learning_rate=0.0001):
+def fine_tune_esm(fasta_file, out_dir, out_prefix, alphabet_size, num_epochs, batch_size=64, learning_rate=0.0001):
     esm_model, alphabet = esm.pretrained.esm2_t12_35M_UR50D()
     fine_tune_model = ESMWithClassifier(esm_model, alphabet_size)
     
@@ -89,8 +91,27 @@ def fine_tune_esm(fasta_file, alphabet_size, num_epochs, batch_size=64, learning
     # Save Model
     fasta_filename = os.path.basename(fasta_file)
     fasta_filename_without_ext = os.path.splitext(fasta_filename)[0]
-    model_save_path = f'model_weights_freezed_{fasta_filename_without_ext}_32_e-4_12_40_Gua_corrected.pth'
+    model_save_path = f'{out_dir}/{prefix}.pth'
     torch.save(fine_tune_model.state_dict(), model_save_path)
 
-# Example usage
-fine_tune_esm('Lysozyme.fasta', alphabet_size=len(esm_alphabet), num_epochs=40)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', required=True, help='Path to input fasta file')
+    parser.add_argument('-o', '--output_dir', type=str, required=False, default='models', help='Path to directory where trained model checkpoints will be saved.')
+    parser.add_argument('-p', '--prefix', type=str, required=False, help='Prefix for output model file name.')
+    args = parser.parse_args()
+    
+    fasta_file = args.input
+    out_dir = args.output_dir
+
+    if args.prefix is not None:
+        out_prefix = args.prefix
+    else:
+        out_prefix = os.path.splitext(os.path.basename(fasta_file))[0]
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    fine_tune_esm(fasta_file, out_dir, out_prefix, alphabet_size=len(esm_alphabet), num_epochs=40)
+    
+if __name__ == "__main__":
+    main()
