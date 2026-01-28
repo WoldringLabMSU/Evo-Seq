@@ -3,7 +3,6 @@
 ![EvoSeq Figure](./Figures/6-1.png)
 
 
-
 Welcome to the EvoSeq-ML project! 🎉 This project leverages ancestral sequence reconstruction (ASR) to enhance machine learning models for protein engineering. Our approach aims to improve protein sequence generation and fine-tuning using rich evolutionary data.
 
 ## Table of Contents
@@ -43,24 +42,40 @@ In protein engineering, advancements in machine learning (ML) have led to signif
 > Reference: Redelings BD BAli-Phy version 3: model-based co-estimation of alignment and phylogeny. (2021) Bioinformatics 37(18). doi:10.1093/bioinformatics/btab129.
 
 ## Usage
-- Dependencies:
-    - numpy
-    - pandas
-    - scipy
-    - torch
-    - torchmetrics
-    - biopython
-    - fair-esm
-    - tqdm
-- Training script: `Generative Model/oh_vae_train.py`
-    - Expects input file `cleaned-aligned-sampled.fasta` to be present in the wokring directory (same directory as the script).
-    - Outputs saved model checkpoints as `Bali_vae_oh_latent100_16_1CNN_{lowest-val-loss}.pth` in the working directory.
-- Finetuning script: `Fine-Tuning/fine-tune.py`
-    - Expects input fasta file which may be modified in line 96, which currently shows example usage with `Lysozyme.fasta`.
-    - Outputs fine-tuned model to working directory. The nomenclature for saved models may be edited in line 92.
-- Generation script: `Generative Model/oh_vae_generate_from_training.py`
-    - Modify the `model_path` variable in line 50 to the desired model checkpoint path.
-    - Outputs sequences to a csv with default name `generated_pk2_Bali_16_1CNN_improved.csv`. This may be edited in line 54 of the script.
+#### Dependencies:
+- numpy
+- pandas
+- scipy
+- torch
+- torchmetrics
+- biopython
+- fair-esm
+- tqdm
+
+#### Training script: `Generative_Model/oh_vae_train.py`
+
+`python3 Generative_Model/oh_vae_train.py -i input_seqs.fasta -o models_dir -p model_prefix`
+
+- -i (--input): required path to input fasta file
+- -o (--output_dir): optional path to output directory to save models (default models/)
+- -p (--prefix): optional prefix to save as model file name (defaults to {name of input fasta file}.pth)
+
+
+#### Generation script: `Generative_Model/oh_vae_generate_from_training.py`
+
+`python3 Generative_Model/oh_vae_generate_from_training.py --model_path nodel.pth --csv_path output-seqs.csv`
+
+- --model_path: required path to pretrained model
+- --output_csv: optional path to csv for output sequences (defaults to {name of input model file}.csv)
+
+
+#### Finetuning script: `Fine-Tuning/fine-tune.py`
+
+`python3 Fine-Tuning/fine-tune.py -i input_seqs.fasta -o models_dir -p model_prefix`
+
+- -i (--input): required path to input fasta file
+- -o (--output_dir): optional path to output directory to save models (default models/)
+- -p (--prefix): optional prefix to save as model file name (defaults to {name of input fasta file}.pth)
 
 
 ## Citation
