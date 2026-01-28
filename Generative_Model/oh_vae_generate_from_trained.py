@@ -1,7 +1,12 @@
+import pandas as pd
 import torch
 from vae_oh_CNN import ProteinVAE
 import torch.nn as nn
 import torch.nn.functional as F
+import argparse
+import os
+
+
 def one_hot_decode(encoded_seq, amino_acids="ACDEFGHIKLMNPQRSTVWY-"):
     """
     /mnt/home/mardikor/ASR-GEN/ASR_Preprocessing/PK2_all/sample_fasta.pyConvert the one-hot encoded sequence tensor back to a string of amino acids.
@@ -46,9 +51,22 @@ def generate_sequences(model_path, num_samples=1000):
           
     return generated_sequences
 
-if __name__ == "__main__":
-    model_path = 'Bali_vae_oh_latent100_16_1CNN_45.220896.pth'  # Adjust this path to point to your model
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_path', type=str, required=True, help='Path to pretrained/fine-tuned model.')
+    parser.add_argument('--csv_path' type=str, required=False, help='Path to save output sequences in csv.')
+    args = parser.parse_args()
+
+    model_path = args.model_path
+    
+    if args.csv_path is not None:
+        csv_path = args.csv_path
+    else:
+        csv_path = f'{os.path.splitext(os.path.basename(model_path))[0]}.csv'
+    
     sequences = generate_sequences(model_path, num_samples=1000)
-print(sequences)  
-import pandas as pd
-sequences= pd.DataFrame(sequences).to_csv('generated_pk2_Bali_16_1CNN_improved.csv')
+    sequences= pd.DataFrame(sequences).to_csv(csv_path, index=False)
+
+if __name__ == "__main__":
+    main()

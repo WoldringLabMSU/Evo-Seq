@@ -86,13 +86,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='Path to input fasta file')
     parser.add_argument('-o', '--output_dir', type=str, required=False, default='models', help='Path to directory where trained model checkpoints will be saved.')
-    parser.add_argument('-p', '--prefix', type=str, required=False, default='OneHot_VAE_latent100_16_1CNN', help='Prefix for output model file name.')
+    parser.add_argument('-p', '--prefix', type=str, required=False, help='Prefix for output model file name.')
     args = parser.parse_args()
     
     fasta_file = args.input
     out_dir = args.output_dir
-    out_prefix = args.prefix
 
+    if args.prefix is not None:
+        out_prefix = args.prefix
+    else:
+        out_prefix = os.path.splitext(os.path.basename(fasta_file))[0]
+        
     os.makedirs(out_dir, exist_ok=True)
 
     sequences = read_fasta_sequences(fasta_file)
