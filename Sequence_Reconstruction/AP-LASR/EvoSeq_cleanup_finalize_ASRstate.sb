@@ -1,0 +1,172 @@
+#!/bin/bash --login
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=8G
+#SBATCH --job-name=Finalize_BA_ASR
+#SBATCH --output=finalize_bali_asr.%j.log
+
+set -euo pipefail
+
+#############################
+# Modules / environment
+#############################
+module purge
+ml -* GCC/12.3.0 OpenMPI/4.1.5
+
+#############################
+# Paths / constants
+#############################
+HOME_DIR="${HOME}"
+OUT="${HOME_DIR}/bp_analyze_output"
+WORK="${OUT}/Work"
+SKIP=100   # burn-in iterations to skip when cutting ranges
+
+# prefer 4.1 image if present, else fall back to beta8
+if [[ -f "${HOME_DIR}/bali-phy-4.1-linux64-intel-singularity.sif" ]]; then
+  SIF="${HOME_DIR}/bali-phy-4.1-linux64-intel-singularity.sif"
+elif [[ -f "${HOME_DIR}/bali-phy-4.0-beta8-linux64-intel-singularity.sif" ]]; then
+  SIF="${HOME_DIR}/bali-phy-4.0-beta8-linux64-intel-singularity.sif"
+else
+  echo "❌ Could not find a BAli-Phy Singularity image in ${HOME_DIR}."
+  echo "   Expected one of: bali-phy-4.1-...sif  or  bali-phy-4.0-beta8-...sif"
+  exit 1
+fi
+
+mkdir -p "${OUT}" "${WORK}"
+
+#############################
+# Find three BAli-Phy runs
+#############################
+echo "Finding BAli-Phy run folders..."
+mapfile -t RUNS < <(ls -d "${HOME_DIR}"/cleaned_input-* 2>/dev/null || true)
+if (( ${#RUNS[@]} < 3 )); then
+  mapfile -t RUNS < <(ls -d "${HOME_DIR}"/Final_Sequences_Short-* 2>/dev/null || true)
+fi
+
+# If still <3, find any dirs containing the BAli-Phy outputs we need
+if (( ${#RUNS[@]} < 3 )); then
+  mapfile -t RUNS < <(find "${HOME_DIR}" -maxdepth 1 -type d \
+    -exec test -f "{}/C1.P1.fastas" \; -exec test -f "{}/C1.trees" \; -print | sort)
+fi
+
+if (( ${#RUNS[@]} < 3 )); then
+  echo "❌ Need at least 3 BAli-Phy run directories with C1.P1.fastas and C1.trees."
+  exit 1
+fi
+
+# choose 3 (prefer *-1, *-3, *-5 if they exist)
+pick_run() { for r in "${RUNS[@]}"; do [[ "$r" =~ "-$1"$ ]] && echo "$r" && return; done; }
+R1="$(pick_run 1 || true)"; R3="$(pick_run 3 || true)"; R5="$(pick_run 5 || true)"
+if [[ -z "$R1" || -z "$R3" || -z "$R5" ]]; then
+  R1="${RUNS[0]}"; R3="${RUNS[1]}"; R5="${RUNS[2]}"
+fi
+
+echo "Using runs:"
+echo "  R1 = ${R1}"
+echo "  R3 = ${R3}"
+echo "  R5 = ${R5}"
+
+# required files check
+for d in "$R1" "$R3" "$R5"; do
+  for f in C1.P1.fastas C1.trees; do
+    [[ -f "$d/$f" ]] || { echo "❌ Missing: $d/$f"; exit 1; }
+  done
+done
+
+#############################
+# Ensure we have a template tree
+#############################
+# Use existing MAP.tree if present, else build a consensus tree from the 3 runs
+if [[ -f "${OUT}/MAP.tree" ]]; then
+  echo "Using existing ${OUT}/MAP.tree"
+else
+  echo "MAP.tree not found; building consensus tree from the 3 runs..."
+  singularity exec "${SIF}" bash -lc "
+    trees-consensus '${R1}/C1.trees' '${R3}/C1.trees' '${R5}/C1.trees' \
+    | tree-tool - --strip-internal-names --name-all-nodes > '${OUT}/MAP.tree'
+  "
+fi
+[[ -s "${OUT}/MAP.tree" ]] || { echo "❌ Failed to create ${OUT}/MAP.tree"; exit 1; }
+
+#############################
+# Step 1: unordered consensus (leaves only)
+#############################
+UNORDERED="${WORK}/P1.consensus.pd-multiply-unordered.fasta"
+if [[ -s "${UNORDERED}" ]]; then
+  echo "Unordered consensus already present: ${UNORDERED}"
+else
+  echo "Step 1: Build unordered consensus alignment (leaves only) from the 3 runs..."
+  singularity exec "${SIF}" bash -lc "
+    cut-range '${R1}/C1.P1.fastas' '${R3}/C1.P1.fastas' '${R5}/C1.P1.fastas' --skip=${SKIP} \
+    | alignment-chop-internal --tree '${OUT}/MAP.tree' \
+    | alignment-max > '${UNORDERED}'
+  "
+fi
+[[ -s "${UNORDERED}" ]] || { echo "❌ Failed to produce ${UNORDERED}"; exit 1; }
+ls -lh "${UNORDERED}"
+
+#############################
+# Step 2: sanitize MAP.tree (remove ONLY trailing underscores on tip names)
+#############################
+echo "Step 2: Sanitize tree tip names (remove trailing underscores only at delimiters)..."
+cp "${OUT}/MAP.tree" "${OUT}/MAP.tree.bak"
+SANITIZED_TREE="${OUT}/MAP.tree.sanitized"
+sed -E 's/([,(])([A-Za-z0-9_.-]+)_([):,])/\1\2\3/g' "${OUT}/MAP.tree" > "${SANITIZED_TREE}"
+[[ -s "${SANITIZED_TREE}" ]] || { echo "❌ Failed to produce ${SANITIZED_TREE}"; exit 1; }
+
+#############################
+# Step 3: reorder consensus to match tree
+#############################
+echo "Step 3: Reorder consensus alignment to match tree tip order..."
+ORDERED="${OUT}/P1.consensus.pd-multiply.fasta"
+singularity exec "${SIF}" alignment-cat \
+  "${UNORDERED}" \
+  --reorder-by-tree="${SANITIZED_TREE}" \
+  > "${ORDERED}"
+
+[[ -s "${ORDERED}" ]] || { echo "❌ alignment-cat failed; ${ORDERED} is empty."; exit 1; }
+ls -lh "${ORDERED}"
+
+#############################
+# Step 4: quick taxa set check
+#############################
+echo "Step 4: Verify taxa match (sets should be identical)..."
+aln_set="${WORK}/.aln_names.txt"
+tree_set="${WORK}/.tree_names.txt"
+grep -E '^>' "${ORDERED}" | sed 's/^>//' | sort -u > "${aln_set}"
+tr '(),:' '\n' < "${SANITIZED_TREE}" | grep -E '^[A-Za-z_][A-Za-z0-9_.-]*$' | sort -u > "${tree_set}"
+
+ALN_N=$(wc -l < "${aln_set}")
+TREE_N=$(wc -l < "${tree_set}")
+echo "Counts: tree=${TREE_N}  aln=${ALN_N}"
+
+echo "Differences (should be empty or very small, printed first 40 lines):"
+comm -3 "${aln_set}" "${tree_set}" | head -n 40 || true
+
+#############################
+# Step 5: summarize-ancestors -> ASR.state
+#############################
+echo "Step 5: summarize-ancestors -> ASR.state"
+ASR_STATE="${OUT}/ASR.state"
+singularity exec "${SIF}" summarize-ancestors \
+  "${ORDERED}" \
+  -n "${SANITIZED_TREE}" \
+  -g "${SANITIZED_TREE}" \
+  -A "${R1}/C1.P1.fastas" -T "${R1}/C1.trees" \
+  -A "${R3}/C1.P1.fastas" -T "${R3}/C1.trees" \
+  -A "${R5}/C1.P1.fastas" -T "${R5}/C1.trees" \
+  > "${ASR_STATE}"
+
+[[ -s "${ASR_STATE}" ]] || { echo "❌ ASR.state is empty."; exit 1; }
+
+echo
+echo "✅ Done."
+echo "ASR.state: $(ls -lh "${ASR_STATE}")"
+echo "Ordered consensus: $(ls -lh "${ORDERED}")"
+echo "Sanitized tree: $(ls -lh "${SANITIZED_TREE}")"
+echo
+echo "Quick ASR summary:"
+echo "  bytes: $(wc -c < "${ASR_STATE}")"
+echo "  nodes: $(grep -c '^>node_' "${ASR_STATE}" || true)"
