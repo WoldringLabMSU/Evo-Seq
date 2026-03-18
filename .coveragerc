@@ -7,7 +7,6 @@ source =
 omit =
     */AP-LASR/bp_aplasr_bali-phy4.1_full_pipeline.sb
     */AP-LASR/EvoSeq_cleanup_finalize_ASRstate.sb
-    Sequence_Reconstruction/AP-LASR/AP-LASR.py
 
 [report]
 show_missing = true

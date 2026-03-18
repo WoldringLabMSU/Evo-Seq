@@ -6,7 +6,7 @@ Coverage targets (generate-sequence-from-IQ-state):
 - generate_sequence: threshold logic, gap on empty numeric row, valid amino-acid choice
 - process_sequence_block: gap insertion at correct positions, out-of-range positions ignored
 - stream_sequences_to_file: correct number of sequences per node, FASTA format
-- insert_gaps: gap characters inserted in right places
+- insert_gaps: gap characters inserted in right places, multiple nodes, no-gap nodes
 
 Coverage targets (Species_Name_Truncator_For_PAML):
 - shorten_species_name: header shortened to 10 chars, short header handled
@@ -311,5 +311,135 @@ class TestProcessFasta:
             assert ">Homo_sapiens_12345" in df["Original Species Names"].values
         finally:
             for p in (in_f, out_f.name, xl_f.name):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+
+# ===========================================================================
+# Tests for insert_gaps (generate-sequence-from-IQ-state.py)
+# ===========================================================================
+
+
+class TestInsertGaps:
+    """
+    insert_gaps reads a gap-info CSV (whitespace-delimited with columns
+    Node, Site, p_0, p_1) and inserts '-' at positions where p_0 > p_1
+    (i.e. gap is more likely than residue).
+
+    It also reads a FASTA sequences file and writes the gapped output.
+    """
+
+    def _write_gap_info(self, rows: list[dict]) -> str:
+        """Write a whitespace-delimited 'gap info' file."""
+        df = pd.DataFrame(rows)
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False)
+        df.to_csv(f.name, index=False, sep=" ")
+        f.close()
+        return f.name
+
+    def _write_sequences_fasta(self, seqs: dict) -> str:
+        """Write a FASTA file from {header: sequence} dict."""
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".fasta", delete=False)
+        for header, seq in seqs.items():
+            f.write(f">{header}\n{seq}\n")
+        f.close()
+        return f.name
+
+    def test_gap_inserted_where_p0_greater_than_p1(self):
+        """p_0 > p_1 means the position is a gap."""
+        gap_rows = [
+            {"Node": "N1", "Site": 2, "p_0": 0.9, "p_1": 0.1},  # site 2 → gap
+        ]
+        gap_f = self._write_gap_info(gap_rows)
+        seq_f = self._write_sequences_fasta({"N1": "ACD"})
+        out_f = tempfile.NamedTemporaryFile(suffix=".fasta", delete=False)
+        out_f.close()
+        try:
+            iq_state.insert_gaps(gap_f, seq_f, out_f.name)
+            with open(out_f.name) as fh:
+                lines = fh.read().splitlines()
+            seq = lines[1]   # second line is the sequence
+            assert seq[1] == "-"   # site 2 (1-based) → index 1
+        finally:
+            for p in (gap_f, seq_f, out_f.name):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_no_gap_where_p1_greater_than_p0(self):
+        """p_1 > p_0 means the position is a residue – no gap inserted."""
+        gap_rows = [
+            {"Node": "N1", "Site": 1, "p_0": 0.1, "p_1": 0.9},
+        ]
+        gap_f = self._write_gap_info(gap_rows)
+        seq_f = self._write_sequences_fasta({"N1": "ACDE"})
+        out_f = tempfile.NamedTemporaryFile(suffix=".fasta", delete=False)
+        out_f.close()
+        try:
+            iq_state.insert_gaps(gap_f, seq_f, out_f.name)
+            with open(out_f.name) as fh:
+                lines = fh.read().splitlines()
+            seq = lines[1]
+            assert seq[0] != "-"
+        finally:
+            for p in (gap_f, seq_f, out_f.name):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_multiple_gap_positions(self):
+        """Multiple gap sites for the same node are all inserted."""
+        gap_rows = [
+            {"Node": "N1", "Site": 1, "p_0": 0.9, "p_1": 0.1},
+            {"Node": "N1", "Site": 3, "p_0": 0.8, "p_1": 0.2},
+        ]
+        gap_f = self._write_gap_info(gap_rows)
+        seq_f = self._write_sequences_fasta({"N1": "ACDE"})
+        out_f = tempfile.NamedTemporaryFile(suffix=".fasta", delete=False)
+        out_f.close()
+        try:
+            iq_state.insert_gaps(gap_f, seq_f, out_f.name)
+            with open(out_f.name) as fh:
+                lines = fh.read().splitlines()
+            seq = lines[1]
+            assert seq[0] == "-"   # site 1 → index 0
+            assert seq[2] == "-"   # site 3 → index 2
+        finally:
+            for p in (gap_f, seq_f, out_f.name):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_node_with_no_gap_rows_unchanged(self):
+        """A node that appears in the FASTA but has no gap rows is untouched."""
+        gap_rows = [
+            {"Node": "OTHER", "Site": 1, "p_0": 0.9, "p_1": 0.1},
+        ]
+        gap_f = self._write_gap_info(gap_rows)
+        seq_f = self._write_sequences_fasta({"N1": "ACDE"})
+        out_f = tempfile.NamedTemporaryFile(suffix=".fasta", delete=False)
+        out_f.close()
+        try:
+            iq_state.insert_gaps(gap_f, seq_f, out_f.name)
+            with open(out_f.name) as fh:
+                lines = fh.read().splitlines()
+            seq = lines[1]
+            assert "-" not in seq
+        finally:
+            for p in (gap_f, seq_f, out_f.name):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_output_fasta_has_correct_header(self):
+        """The output FASTA must preserve the node name in the header."""
+        gap_rows = [{"Node": "NodeA", "Site": 1, "p_0": 0.1, "p_1": 0.9}]
+        gap_f = self._write_gap_info(gap_rows)
+        seq_f = self._write_sequences_fasta({"NodeA": "ACDE"})
+        out_f = tempfile.NamedTemporaryFile(suffix=".fasta", delete=False)
+        out_f.close()
+        try:
+            iq_state.insert_gaps(gap_f, seq_f, out_f.name)
+            with open(out_f.name) as fh:
+                lines = fh.read().splitlines()
+            assert lines[0] == ">NodeA"
+        finally:
+            for p in (gap_f, seq_f, out_f.name):
                 if os.path.exists(p):
                     os.unlink(p)
