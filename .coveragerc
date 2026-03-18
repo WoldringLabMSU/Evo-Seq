@@ -1,0 +1,18 @@
+[run]
+source =
+    Fine-Tuning
+    Generative_Model
+    Sequence_Reconstruction
+
+omit =
+    */AP-LASR/bp_aplasr_bali-phy4.1_full_pipeline.sb
+    */AP-LASR/EvoSeq_cleanup_finalize_ASRstate.sb
+    Sequence_Reconstruction/AP-LASR/AP-LASR.py
+
+[report]
+show_missing = true
+skip_covered = false
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    ^\s*pass\s*$
