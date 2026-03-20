@@ -195,7 +195,9 @@ AA_key = [
 
 # Reads in fasta file and renames certain sequences based on forbidden
 # characters in IQ Tree as needed
-def fasta2dict(fasta_path, return_dict={}):
+def fasta2dict(fasta_path, return_dict=None):
+    if return_dict is None:
+        return_dict = {}
     # Read in the file and prepare some variables
     with open(fasta_path, 'r') as infile:
         fastafile = infile.readlines()
@@ -1630,7 +1632,7 @@ def Library_Size_Count(Degenerate_Sequence):
     if not Is_Valid_Codon(Degenerate_Sequence):
         raise ValueError("Not a valid DNA sequence")
     Codons = [Degenerate_Sequence[i:i + 3]
-              for i in range(0, len(Degenerate_Sequence) - 2, 3)]
+              for i in range(0, len(Degenerate_Sequence), 3)]
     Library_Size = 1
     for Codon in Codons:
         CodedAminoAcids = []

@@ -91,7 +91,7 @@ def fine_tune_esm(fasta_file, out_dir, out_prefix, alphabet_size, num_epochs, ba
     # Save Model
     fasta_filename = os.path.basename(fasta_file)
     fasta_filename_without_ext = os.path.splitext(fasta_filename)[0]
-    model_save_path = f'{out_dir}/{prefix}.pth'
+    model_save_path = f'{out_dir}/{out_prefix}.pth'
     torch.save(fine_tune_model.state_dict(), model_save_path)
 
 def main():

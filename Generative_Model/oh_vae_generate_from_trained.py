@@ -55,7 +55,7 @@ def generate_sequences(model_path, num_samples=1000):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True, help='Path to pretrained/fine-tuned model.')
-    parser.add_argument('--csv_path' type=str, required=False, help='Path to save output sequences in csv.')
+    parser.add_argument('--csv_path', type=str, required=False, help='Path to save output sequences in csv.')
     args = parser.parse_args()
 
     model_path = args.model_path

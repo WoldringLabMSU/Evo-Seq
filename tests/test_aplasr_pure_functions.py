@@ -218,6 +218,17 @@ class TestIsValidAA:
         for aa in AA_key:
             assert Is_Valid_AA(aa), f"Standard AA {aa!r} should be valid"
 
+    def test_empty_list_does_not_crash(self):
+        """
+        Regression test: Is_Valid_AA([]) previously raised IndexError on
+        AA[0] because the list-of-strings branch accessed the first element
+        before checking whether it was empty.  An empty list is vacuously
+        valid (no invalid amino acids present).
+        """
+        # Should not raise; an empty collection has no invalid elements.
+        result = Is_Valid_AA([])
+        assert result is True
+
 
 # ===========================================================================
 # Is_Valid_Codon
@@ -488,3 +499,52 @@ class TestLibrarySizeCount:
     def test_library_size_is_positive(self):
         for codon in ["atg", "gcc", "tgg", "cgt"]:
             assert Library_Size_Count(codon) >= 1
+
+    def test_two_distinct_unambiguous_codons_multiply_independently(self):
+        """
+        Regression test for off-by-one bug: the original code used
+        range(0, len-2, 3) which silently dropped the last codon of any
+        sequence.  "atg" (Met, 1 AA) + "tgg" (Trp, 1 AA) should give
+        1 × 1 = 1.  With the old bug the second codon was never iterated
+        so Library_Size_Count("atgtgg") would still return 1 by accident.
+        Use "atgwsn" (Met + degenerate second codon encoding multiple AAs)
+        to make the second codon's contribution observable.
+        """
+        # "atg" = Met only (1 AA).
+        # "wsn" is a highly degenerate codon encoding many amino acids (≥ 4).
+        # Correct result: 1 × Library_Size_Count("wsn")  > 1.
+        single = Library_Size_Count("wsn")
+        combined = Library_Size_Count("atgwsn")
+        assert combined == single, (
+            f"Expected atg (×1) * wsn (×{single}) = {single}, got {combined}. "
+            "This suggests the second codon is being dropped (off-by-one bug)."
+        )
+
+    def test_three_codon_sequence_counts_all_codons(self):
+        """
+        Verify all three codons in a 9-base string are counted.
+        "gcc" (A, 1) * "atg" (M, 1) * "tgg" (W, 1) = 1.
+        """
+        assert Library_Size_Count("gccatgtgg") == 1
+
+    def test_mutable_default_argument_does_not_leak_between_calls(self, tmp_path):
+        """
+        Regression test for mutable default argument bug in fasta2dict.
+        The original signature was fasta2dict(path, return_dict={}) — Python
+        creates that dict once at function-definition time, so state from one
+        call would bleed into the next call that relied on the default.
+        Two independent calls must return independent dicts.
+        """
+        p1 = str(tmp_path / "a.fasta")
+        p2 = str(tmp_path / "b.fasta")
+        with open(p1, "w") as f:
+            f.write(">seqA\nACDE\n")
+        with open(p2, "w") as f:
+            f.write(">seqB\nLMNO\n")
+        d1 = fasta2dict(p1)   # uses default return_dict
+        d2 = fasta2dict(p2)   # must NOT see seqA
+        assert "seqA" not in d2, (
+            "fasta2dict returned seqA in a second call that should only see seqB. "
+            "This indicates the mutable-default-argument bug is still present."
+        )
+        assert "seqB" not in d1

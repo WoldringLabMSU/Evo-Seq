@@ -2,29 +2,10 @@
 Tests for Generative_Model/oh_vae_generate_from_trained.py
 and the remaining untested function in oh_vae_train.py (train_vae_model).
 
-NOTE ON KNOWN SYNTAX ERRORS
------------------------------
-Two source files in Generative_Model/ contain syntax errors that must be
-fixed before these tests can pass:
-
-1. oh_vae_train.py  (line 37)
-   Missing comma between `out_prefix` and `num_epochs=300`:
-     def train_vae_model(..., out_prefix num_epochs=300, ...)
-   Fix:
-     def train_vae_model(..., out_prefix, num_epochs=300, ...)
-
-2. oh_vae_generate_from_trained.py  (line 58)
-   Missing comma between `'--csv_path'` and `type=str`:
-     parser.add_argument('--csv_path' type=str, ...)
-   Fix:
-     parser.add_argument('--csv_path', type=str, ...)
-
-These tests use importlib so they can emit a clear failure message instead
-of a confusing ImportError / SyntaxError when the bugs are still present.
-
-Coverage targets (once bugs are fixed)
----------------------------------------
-- one_hot_decode: correct output string, shape handling, custom alphabet
+Coverage targets
+----------------
+- one_hot_decode: correct output string, shape handling, custom alphabet,
+  regression for wrong-dim argmax bug
 - generate_sequences: returns list of strings with correct length, requires
   a saved model file (skipped without one)
 - train_vae_model: 1-epoch smoke test, early stopping, model saved to disk
@@ -152,6 +133,29 @@ class TestOneHotDecode:
         custom_aa = "ACG"
         result = _gen_mod.one_hot_decode(t, amino_acids=custom_aa)
         assert result == "C"   # index 1
+
+    def test_standard_one_hot_input_shape_decodes_correctly(self):
+        """
+        Regression test for wrong-dimension argmax bug.
+
+        one_hot_decode receives tensors of shape (1, seq_len, vocab).
+        The amino-acid axis is dim=2 (the last dimension), so argmax must be
+        taken along dim=2 to get the per-position amino-acid index.
+
+        The original code used dim=2 on a (1, seq_len, vocab) tensor, which
+        happens to be correct for that layout.  This test makes the expected
+        layout explicit so any future dimension change is immediately caught.
+        """
+        # Build a (1, 5, 3) tensor where every position = amino acid index 1
+        # in a custom 3-letter alphabet "ACG"
+        custom_aa = "ACG"
+        t = torch.zeros(1, 5, 3)
+        t[0, :, 1] = 1.0   # position 1 ('C') set at every sequence position
+        result = _gen_mod.one_hot_decode(t, amino_acids=custom_aa)
+        assert result == "CCCCC", (
+            f"Expected 'CCCCC' but got {result!r}. "
+            "This may indicate argmax is taken on the wrong dimension."
+        )
 
 
 # ===========================================================================
