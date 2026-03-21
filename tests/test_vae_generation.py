@@ -203,6 +203,20 @@ class TestGenerateSequences:
             for char in seq:
                 assert char in AMINO_ACIDS, f"Unexpected character: {char!r}"
 
+    def test_custom_seq_len_generates_correct_length(self, tmp_path):
+        """generate_sequences respects seq_len parameter (e.g. 275)."""
+        from vae_oh_CNN import ProteinVAE
+        custom_len = 275
+        vae = ProteinVAE(latent_dim=100, seq_len=custom_len)
+        path = str(tmp_path / "model_275.pth")
+        torch.save(vae.state_dict(), path)
+        seqs = _gen_mod.generate_sequences(path, num_samples=2, seq_len=custom_len)
+        assert len(seqs) == 2
+        for seq in seqs:
+            assert len(seq) == custom_len, (
+                f"Expected seq_len={custom_len}, got {len(seq)}"
+            )
+
 
 # ===========================================================================
 # train_vae_model (smoke test – 1 epoch, tiny dataset)

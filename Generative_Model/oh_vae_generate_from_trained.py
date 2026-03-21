@@ -25,10 +25,10 @@ def one_hot_decode(encoded_seq, amino_acids="ACDEFGHIKLMNPQRSTVWY-"):
     return sequence
 
 
-def generate_sequences(model_path, num_samples=1000):
+def generate_sequences(model_path, num_samples=1000, seq_len=404):
     # Load the VAE model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    vae = ProteinVAE().to(device)
+    vae = ProteinVAE(seq_len=seq_len).to(device)
     vae.load_state_dict(torch.load(model_path))
     vae.eval()
 
@@ -56,16 +56,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True, help='Path to pretrained/fine-tuned model.')
     parser.add_argument('--csv_path', type=str, required=False, help='Path to save output sequences in csv.')
+    parser.add_argument('--seq_len', type=int, required=False, default=404, help='Length of protein sequences used during training.')
+    parser.add_argument('--num_samples', type=int, required=False, default=1000, help='Number of sequences to generate.')
     args = parser.parse_args()
 
     model_path = args.model_path
-    
+
     if args.csv_path is not None:
         csv_path = args.csv_path
     else:
         csv_path = f'{os.path.splitext(os.path.basename(model_path))[0]}.csv'
-    
-    sequences = generate_sequences(model_path, num_samples=1000)
+
+    sequences = generate_sequences(model_path, num_samples=args.num_samples, seq_len=args.seq_len)
     sequences= pd.DataFrame(sequences).to_csv(csv_path, index=False)
 
 if __name__ == "__main__":

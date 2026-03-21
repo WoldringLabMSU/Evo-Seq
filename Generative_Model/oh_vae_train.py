@@ -100,13 +100,14 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     sequences = read_fasta_sequences(fasta_file)
-    print(f"Sequence length: {len(sequences[1])}")
+    seq_len = len(sequences[0])
+    print(f"Sequence length: {seq_len}")
 
     encoded_data = [one_hot_encode(seq) for seq in sequences]
     X_train, X_val = train_val_split(encoded_data, val_ratio=0.1)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    vae = ProteinVAE().to(device)
+    vae = ProteinVAE(seq_len=seq_len).to(device)
 
     train_loader = DataLoader(X_train, batch_size=16, shuffle=True)
     val_loader = DataLoader(X_val, batch_size=16, shuffle=False)

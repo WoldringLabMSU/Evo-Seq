@@ -9,13 +9,13 @@ class Sampling(nn.Module):
         return z_mean + torch.exp(0.5 * z_log_var) * epsilon
 
 class Encoder(nn.Module):
-    def __init__(self, latent_dim=100):
+    def __init__(self, latent_dim=100, seq_len=404):
         super(Encoder, self).__init__()
         self.conv1 = nn.Conv1d(21, 64, kernel_size=3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm1d(64)
         self.flatten = nn.Flatten()
-        
-        self.fc1 = nn.Linear(64*404, 10000)
+
+        self.fc1 = nn.Linear(64*seq_len, 10000)
         self.fc2 = nn.Linear(10000, 5000)
         self.fc3 = nn.Linear(5000, 2000)
         self.fc4 = nn.Linear(2000, 500)
@@ -41,18 +41,19 @@ class Encoder(nn.Module):
         return z_mean, z_log_var, z
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim=200):
+    def __init__(self, latent_dim=200, seq_len=404):
         super(Decoder, self).__init__()
+        self.seq_len = seq_len
         self.fc1 = nn.Linear(latent_dim, 500)
         self.fc2 = nn.Linear(500, 2000)
         self.fc3 = nn.Linear(2000, 5000)
         self.fc4 = nn.Linear(5000, 10000)
-        self.fc5 = nn.Linear(10000, 64 * 404)
-        
+        self.fc5 = nn.Linear(10000, 64 * seq_len)
+
         self.deconv1 = nn.ConvTranspose1d(64, 21, kernel_size=3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm1d(21)
         self.dropout = nn.Dropout(0.2)  # Added dropout layer
-    
+
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
@@ -62,15 +63,15 @@ class Decoder(nn.Module):
         x = F.relu(self.fc4(x))
         x = self.dropout(x)
         x = F.relu(self.fc5(x))
-        x = x.view(x.size(0), 64, 404)
+        x = x.view(x.size(0), 64, self.seq_len)
         x = torch.sigmoid(self.deconv1(x))
         return x.transpose(1, 2)
 
 class ProteinVAE(nn.Module):
-    def __init__(self, latent_dim=100):
+    def __init__(self, latent_dim=100, seq_len=404):
         super(ProteinVAE, self).__init__()
-        self.encoder = Encoder(latent_dim)
-        self.decoder = Decoder(latent_dim)
+        self.encoder = Encoder(latent_dim, seq_len)
+        self.decoder = Decoder(latent_dim, seq_len)
     
     def forward(self, x):
         z_mean, z_log_var, z = self.encoder(x)
@@ -83,5 +84,6 @@ class ProteinVAE(nn.Module):
         return recon_loss + kl_loss
 
 # Print the model
-model = ProteinVAE()
-print(model)
+if __name__ == "__main__":
+    model = ProteinVAE()
+    print(model)

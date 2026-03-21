@@ -291,3 +291,47 @@ class TestTrainValSplit:
         train, val = train_val_split(data, val_ratio=0.0)
         assert len(val) == 0
         assert len(train) == 20
+
+
+# ---------------------------------------------------------------------------
+# seq_len parameter (architecture parameterisation tests)
+# ---------------------------------------------------------------------------
+
+CUSTOM_SEQ_LEN = 275
+
+
+class TestSeqLenParameter:
+    """Verify that Encoder, Decoder, and ProteinVAE work with seq_len != 404."""
+
+    def test_encoder_custom_seq_len_output_shape(self):
+        enc = Encoder(latent_dim=LATENT_DIM, seq_len=CUSTOM_SEQ_LEN).eval()
+        x = torch.zeros(BATCH, CUSTOM_SEQ_LEN, N_AA)
+        with torch.no_grad():
+            z_mean, z_log_var, z = enc(x)
+        assert z_mean.shape == (BATCH, LATENT_DIM)
+        assert z.shape == (BATCH, LATENT_DIM)
+
+    def test_decoder_custom_seq_len_output_shape(self):
+        dec = Decoder(latent_dim=LATENT_DIM, seq_len=CUSTOM_SEQ_LEN).eval()
+        z = torch.randn(BATCH, LATENT_DIM)
+        with torch.no_grad():
+            out = dec(z)
+        assert out.shape == (BATCH, CUSTOM_SEQ_LEN, N_AA)
+
+    def test_vae_custom_seq_len_reconstruction_shape(self):
+        vae = ProteinVAE(latent_dim=LATENT_DIM, seq_len=CUSTOM_SEQ_LEN).eval()
+        indices = torch.randint(0, N_AA, (BATCH, CUSTOM_SEQ_LEN))
+        x = torch.nn.functional.one_hot(indices, N_AA).float()
+        with torch.no_grad():
+            z_mean, z_log_var, recon = vae(x)
+        assert recon.shape == (BATCH, CUSTOM_SEQ_LEN, N_AA)
+
+    def test_vae_custom_seq_len_loss_is_finite(self):
+        vae = ProteinVAE(latent_dim=LATENT_DIM, seq_len=CUSTOM_SEQ_LEN).eval()
+        indices = torch.randint(0, N_AA, (BATCH, CUSTOM_SEQ_LEN))
+        x = torch.nn.functional.one_hot(indices, N_AA).float()
+        with torch.no_grad():
+            z_mean, z_log_var, recon = vae(x)
+            loss = vae.loss(x, z_mean, z_log_var, recon)
+        assert torch.isfinite(loss)
+        assert loss.item() > 0
