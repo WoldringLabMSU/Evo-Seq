@@ -34,8 +34,9 @@ def train_val_split(data, val_ratio=0.1):
     train_data = shuffled_data[val_size:]
     return train_data, val_data
 
-def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, num_epochs=300, lr=0.0001, weight_decay=1e-8, patience=5):
+def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, num_epochs=300, lr=0.0001, weight_decay=1e-8, patience=20):
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.5, verbose=True)
     lowest_val_loss = float('inf')
     patience_counter = 0
     prev_best_model_filename = None
@@ -51,7 +52,7 @@ def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, 
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-        
+
         train_loss /= len(train_loader.dataset)
         print(f"Epoch {epoch+1}/{num_epochs}, Training Loss: {train_loss:.4f}")
 
@@ -62,16 +63,17 @@ def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, 
                 batch = batch.to(device)
                 z_mean, z_log_var, reconstruction = vae(batch)
                 val_loss += vae.loss(batch, z_mean, z_log_var, reconstruction).item()
-        
+
         val_loss /= len(val_loader.dataset)
         print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}")
-        
+        scheduler.step(val_loss)
+
         if val_loss < lowest_val_loss:
             patience_counter = 0
             lowest_val_loss = val_loss
             if prev_best_model_filename and os.path.exists(prev_best_model_filename):
                 os.remove(prev_best_model_filename)
-            
+
             filename = f"{out_dir}/{out_prefix}_{lowest_val_loss:.6f}.pth"
             torch.save(vae.state_dict(), filename)
             print(f"Epoch {epoch+1}/{num_epochs}: New best model saved with Validation Loss: {lowest_val_loss:.6f}")
@@ -87,6 +89,7 @@ def main():
     parser.add_argument('-i', '--input', type=str, required=True, help='Path to input fasta file')
     parser.add_argument('-o', '--output_dir', type=str, required=False, default='models', help='Path to directory where trained model checkpoints will be saved.')
     parser.add_argument('-p', '--prefix', type=str, required=False, help='Prefix for output model file name.')
+    parser.add_argument('--patience', type=int, default=20, help='Early stopping patience (epochs without improvement).')
     args = parser.parse_args()
     
     fasta_file = args.input
@@ -112,7 +115,7 @@ def main():
     train_loader = DataLoader(X_train, batch_size=16, shuffle=True)
     val_loader = DataLoader(X_val, batch_size=16, shuffle=False)
 
-    train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix)
+    train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, patience=args.patience)
 
 if __name__ == "__main__":
     main()
