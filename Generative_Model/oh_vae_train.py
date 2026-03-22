@@ -36,7 +36,7 @@ def train_val_split(data, val_ratio=0.1):
 
 def train_vae_model(vae, train_loader, val_loader, device, out_dir, out_prefix, num_epochs=300, lr=0.0001, weight_decay=1e-8, patience=20):
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.5)
     lowest_val_loss = float('inf')
     patience_counter = 0
     prev_best_model_filename = None
